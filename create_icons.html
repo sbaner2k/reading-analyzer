@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Icons</title>
+</head>
+<body>
+    <canvas id="canvas16" width="16" height="16"></canvas>
+    <canvas id="canvas48" width="48" height="48"></canvas>
+    <canvas id="canvas128" width="128" height="128"></canvas>
+    <script>
+        function createIcon(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // Draw background
+            ctx.fillStyle = '#2196F3';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Draw clock face
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw clock hands
+            ctx.fillStyle = '#2196F3';
+            // Hour hand
+            ctx.save();
+            ctx.translate(size/2, size/2);
+            ctx.rotate(Math.PI / 6);
+            ctx.fillRect(-size/20, -size/3, size/10, size/3);
+            ctx.restore();
+            
+            // Minute hand
+            ctx.save();
+            ctx.translate(size/2, size/2);
+            ctx.rotate(Math.PI / 3);
+            ctx.fillRect(-size/30, -size/2.5, size/15, size/2.5);
+            ctx.restore();
+            
+            // Download the icon
+            const link = document.createElement('a');
+            link.download = `icon${size}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        // Create all three icons
+        createIcon('canvas16', 16);
+        createIcon('canvas48', 48);
+        createIcon('canvas128', 128);
+    </script>
+</body>
+</html> 
