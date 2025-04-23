@@ -51,6 +51,11 @@ function startSession() {
                     action: 'updateSessionTime',
                     currentTime: currentSessionTime,
                     totalTime: totalSessionTimes[currentUrl]
+                }).then(response => {
+                    console.log('Time update message sent, currentTime:', currentSessionTime);
+                }).catch(error => {
+                    // This is normal if the popup is closed - Chrome will throw an error
+                    console.log('Could not send time update - popup might be closed');
                 });
             }, 1000);
             
@@ -61,8 +66,12 @@ function startSession() {
             // Notify popup that session has started
             chrome.runtime.sendMessage({
                 action: 'sessionStarted',
-                currentTime: currentSessionTime,
-                totalTime: totalSessionTimes[currentUrl]
+                currentTime: 0,
+                totalTime: totalSessionTimes[currentUrl] || 0
+            }).then(response => {
+                console.log('Session started message sent to popup, response:', response);
+            }).catch(error => {
+                console.error('Error sending session started message:', error);
             });
 
             // Store the session with the URL
@@ -92,10 +101,26 @@ function stopSession() {
         // Save session to history
         chrome.storage.local.get(['sessions'], (result) => {
             const sessions = result.sessions || [];
+            if (sessions.length === 0) {
+                console.error('No sessions found when stopping session');
+                return;
+            }
+            
             const lastSession = sessions[sessions.length - 1];
-            lastSession.endTime = Date.now();
-            lastSession.duration = duration;
-            chrome.storage.local.set({ sessions });
+            if (!lastSession) {
+                console.error('Could not find the last session');
+                return;
+            }
+            
+            // Make sure we're updating the correct session (matching URL)
+            if (lastSession.url === currentUrl) {
+                lastSession.endTime = Date.now();
+                lastSession.duration = duration;
+                console.log('Updated session with endTime and duration:', lastSession);
+                chrome.storage.local.set({ sessions });
+            } else {
+                console.error('Last session URL does not match current URL');
+            }
         });
         
         // Reset current session
@@ -106,7 +131,7 @@ function stopSession() {
         chrome.runtime.sendMessage({
             action: 'sessionStopped',
             currentTime: 0,
-            totalTime: totalSessionTimes[currentUrl]
+            totalTime: totalSessionTimes[currentUrl] || 0
         });
     }
 }
@@ -121,10 +146,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         stopSession();
         sendResponse({ success: true });
     } else if (request.action === 'getSessionStatus') {
+        // Check if there's a URL in the request to get the specific URL's total time
+        const urlToCheck = request.url || currentUrl;
+        const totalTimeForUrl = totalSessionTimes[urlToCheck] || 0;
+        
+        // Return the status of the currently *active* session,
+        // including the total time accumulated for the URL associated with that session.
         sendResponse({
             isActive: isSessionActive,
-            currentTime: currentSessionTime,
-            totalTime: totalSessionTimes[currentUrl] || 0
+            currentTime: currentSessionTime, // Time elapsed in the current active session
+            totalTime: totalTimeForUrl, // Total time for the requested URL
+            currentUrl: currentUrl // Let the popup know which URL is currently being tracked
         });
     }
     return true;
