@@ -103,6 +103,27 @@ button:disabled {
     background-color: #c0392b;
 }
 
+.clear-sessions-btn {
+    background-color: #FF9800;
+    color: white;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex: 1;
+}
+
+.clear-sessions-btn:hover:not(:disabled) {
+    background-color: #F57C00;
+}
+
+.clear-sessions-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .history-container {
     margin-top: 20px;
 }

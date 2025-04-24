@@ -158,6 +158,52 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             totalTime: totalTimeForUrl, // Total time for the requested URL
             currentUrl: currentUrl // Let the popup know which URL is currently being tracked
         });
+    } else if (request.action === 'clearUrlTime') {
+        // Reset the total time for the specified URL
+        const urlToClear = request.url || currentUrl;
+        const forceReset = request.forceReset || false; // Check if this is a forced reset
+        
+        console.log(`Clearing URL time for ${urlToClear} (force: ${forceReset})`);
+        
+        // Always reset the total time for this URL
+        totalSessionTimes[urlToClear] = 0;
+        
+        // Save the updated times to storage immediately
+        chrome.storage.local.set({ totalSessionTimes }, () => {
+            console.log('Saved resetted total times to storage');
+        });
+        
+        // If this is the current active URL, reset the current session time too
+        if (isSessionActive && urlToClear === currentUrl) {
+            console.log('Resetting active session for current URL');
+            
+            // Reset the current session time
+            currentSessionTime = 0;
+            
+            // Update badge
+            chrome.action.setBadgeText({ text: '00:00:00' });
+            
+            // If this is a forced reset or we're resetting the current URL
+            if (forceReset) {
+                console.log('Sending forced reset notification to popup');
+                
+                // Stop any ongoing session if this is a force reset
+                clearInterval(updateInterval);
+                updateInterval = null;
+                
+                // Notify popup of the reset with a forced flag
+                chrome.runtime.sendMessage({
+                    action: 'sessionReset',
+                    currentTime: 0,
+                    totalTime: 0,
+                    forced: true
+                });
+            }
+        }
+        
+        console.log('Reset total time for URL:', urlToClear);
+        
+        sendResponse({ success: true });
     }
     return true;
 });

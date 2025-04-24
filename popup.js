@@ -8,7 +8,17 @@ const currentSessionTimeElement = document.getElementById('currentSessionTime');
 const totalSessionTimeElement = document.getElementById('totalSessionTime');
 const noSessionsElement = document.getElementById('noSessions');
 const sessionListElement = document.getElementById('sessionList');
-const clearSessionsBtn = document.getElementById('clearSessionsBtn');
+
+// Create Clear Sessions button
+const clearSessionsBtn = document.createElement('button');
+clearSessionsBtn.textContent = 'Clear History';
+clearSessionsBtn.className = 'clear-sessions-btn';
+clearSessionsBtn.id = 'clearSessionsBtn';
+
+// Add clear button after stop button
+if (stopBtn && stopBtn.parentNode) {
+    stopBtn.parentNode.insertBefore(clearSessionsBtn, stopBtn.nextSibling);
+}
 
 // State
 let isSessionActive = false;
@@ -210,11 +220,55 @@ async function loadSessionHistory() {
 }
 
 async function clearSessions() {
+    console.log('Clear Sessions button clicked');
     try {
+        // Immediately update UI first for faster feedback
+        // Explicitly reset the time displays to 00:00:00
+        const currentElement = document.getElementById('currentSessionTime');
+        const totalElement = document.getElementById('totalSessionTime');
+        
+        if (currentElement) {
+            currentElement.textContent = '00:00:00';
+        }
+        
+        if (totalElement) {
+            totalElement.textContent = '00:00:00';
+        }
+        
+        // Reset local variables too
+        localSessionTime = 0;
+        
+        // Clear any active local timer
+        if (popupTimerInterval) {
+            clearInterval(popupTimerInterval);
+            popupTimerInterval = null;
+        }
+        
+        // Reset session history display
+        noSessionsElement.style.display = 'block';
+        sessionListElement.style.display = 'none';
+        sessionListElement.innerHTML = '';
+        
+        // Then perform the actual data clearing
         const result = await chrome.storage.local.get('sessions');
         const sessions = result.sessions || [];
+        
+        // Filter out sessions with current URL
         const remainingSessions = sessions.filter(session => session.url !== currentUrl);
+        
+        // Set the filtered sessions back to storage
         await chrome.storage.local.set({ sessions: remainingSessions });
+        
+        // Reset the total time for this URL in background script
+        const bgResponse = await chrome.runtime.sendMessage({ 
+            action: 'clearUrlTime',
+            url: currentUrl,
+            forceReset: true // Signal that this is a direct user action
+        });
+        
+        console.log('Sessions cleared for URL:', currentUrl);
+        
+        // Update UI again to ensure everything is in sync
         await loadSessionHistory();
     } catch (error) {
         console.error('Error clearing sessions:', error);
@@ -312,6 +366,41 @@ async function initialize() {
             }
             localSessionTime = 0;
             updateSessionTime(0, request.totalTime);
+            loadSessionHistory();
+        } else if (request.action === 'sessionReset') {
+            console.log('[Popup Listener] Session reset (forced:', request.forced, ')');
+            
+            // Reset the UI immediately
+            // Get fresh references to DOM elements
+            const currentElement = document.getElementById('currentSessionTime');
+            const totalElement = document.getElementById('totalSessionTime');
+            
+            if (currentElement) {
+                currentElement.textContent = '00:00:00';
+            }
+            
+            if (totalElement) {
+                totalElement.textContent = '00:00:00';
+            }
+            
+            // Reset local variables
+            localSessionTime = 0;
+            
+            // If this is a forced reset, reset the session state too
+            if (request.forced) {
+                // Clear any active local timer
+                if (popupTimerInterval) {
+                    clearInterval(popupTimerInterval);
+                    popupTimerInterval = null;
+                }
+                
+                // Reset session state
+                isSessionActive = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+            
+            // Reload session history
             loadSessionHistory();
         }
         return true; // Important: tells Chrome this listener handled the message
